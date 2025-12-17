@@ -1,41 +1,55 @@
-# Terraform Remote State — Bootstrap Archived (Infra Kept)
+# Terraform Remote State (Backend already deployed)
 
-The AWS backend infrastructure (**S3 + DynamoDB + KMS**) is **already deployed** and remains running.
-We removed the bootstrap IaC code from this repo to keep it clean. You can restore it from the safety tag if needed.
+This repository **does not create the backend**. The AWS pieces you need are **already live**:
 
-## Restore the bootstrap code from tag
-Latest tag (auto-detected): `infra-bootstrap-20251017-211937`
+- S3 bucket for Terraform state
+- DynamoDB table for state locking
+- KMS key for encryption
+
+We removed the bootstrap Infrastructure-as-Code to keep the repo small, but you can restore it from a safety tag if you ever need to make changes.
+
+---
+
+## If you need the original bootstrap code
+Latest safety tag: `infra-bootstrap-20251017-211937`
 
 ```bash
 git fetch --tags
 git checkout -b restore-bootstrap infra-bootstrap-20251017-211937
-# make changes as needed, then:
-# terraform init/plan/apply
+# make any updates, then run:
+# terraform init
+# terraform plan
+# terraform apply
 ```
 
-## Using this backend in other repos
-1) Copy the example file to a local config:
-```bash
-cp backend/dev.example.hcl backend/dev.hcl
-```
-2) Edit `backend/dev.hcl` with your real values:
-- `<STATE_BUCKET_NAME>` (S3 bucket)
-- `<STATE_KEY_PATH>` (e.g., repo/dev/terraform.tfstate)
-- `<AWS_REGION>` (e.g., us-east-1)
-- `<DDB_LOCK_TABLE_NAME>`
-- `<KMS_KEY_ARN>`
+---
 
-3) Ensure Terraform has an empty backend block:
-```hcl
-terraform { backend "s3" {} }
-```
+## How to point another repo at this backend (step by step)
+1) Copy the example backend config and use it as your local file:
+   ```bash
+   cp backend/dev.example.hcl backend/dev.hcl
+   ```
 
-4) Initialize:
-```bash
-terraform init -reconfigure -backend-config=backend/dev.hcl
-```
+2) Open `backend/dev.hcl` and fill in real values for:
+   - `<STATE_BUCKET_NAME>` (the existing S3 bucket name)
+   - `<STATE_KEY_PATH>` (e.g., `my-repo/dev/terraform.tfstate`)
+   - `<AWS_REGION>` (e.g., `us-east-1`)
+   - `<DDB_LOCK_TABLE_NAME>` (the existing DynamoDB lock table)
+   - `<KMS_KEY_ARN>` (the existing KMS key ARN)
 
-## Notes
-- Do **not** commit `backend/dev.hcl` (real values). Commit only `backend/dev.example.hcl`.
-- `.terraform.lock.hcl` is safe to commit (pins provider versions).
-- Backend enforces KMS encryption and DynamoDB locking.
+3) In your Terraform code, keep the backend block empty (Terraform fills it using your file):
+   ```hcl
+   terraform { backend "s3" {} }
+   ```
+
+4) Initialize Terraform with your backend settings:
+   ```bash
+   terraform init -reconfigure -backend-config=backend/dev.hcl
+   ```
+
+---
+
+## What to commit (and not commit)
+- **Commit:** `backend/dev.example.hcl` and `.terraform.lock.hcl` (locks provider versions).
+- **Do not commit:** `backend/dev.hcl` (it will contain real AWS values).
+- Security: the backend enforces KMS encryption and DynamoDB locking by default.
